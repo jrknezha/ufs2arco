@@ -15,15 +15,15 @@ class NOAA20CR(Source):
     """
 
     # Typical dimensions for 20CR NetCDF files
-    sample_dims = ("time", "level", "lat", "lon")
-    horizontal_dims = ("lat", "lon")
+    sample_dims = ("time",)
+    horizontal_dims = ("latitude", "longitude")
     
-    # Common static variables in 20CR (topography, land-sea mask)
     static_vars = ("hgt_sfc", "land") 
 
-    # Example variables; update these based on the specific files you are indexing
     available_variables = (
-        "uwnd", "vwnd", "air", "shum", "hgt", "air_2m", "shum_2m", "uwnd_10m", "vwnd_10m", "pres_sfc", "skt_sfc"
+        "uwnd", "vwnd", "air", "shum", "hgt", "air_2m", "shum_2m", 
+        "uwnd_10m", "vwnd_10m", "pres_sfc", "skt_sfc", 
+        "land", "hgt_sfc",
     )
 
     # Standard 20CR v3 pressure levels (hPa)
@@ -46,11 +46,14 @@ class NOAA20CR(Source):
 
     def __init__(
         self,
+        time: dict,
         variables: Optional[list | tuple] = None,
         levels: Optional[list | tuple] = None,
         use_nearest_levels: Optional[bool] = False,
         slices: Optional[dict] = None,
     ) -> None:
+        self.time = pd.date_range(**time)
+
         super().__init__(
             variables=variables,
             levels=levels,
@@ -58,26 +61,6 @@ class NOAA20CR(Source):
             slices=slices
         )
 
-    def open_dataset(self, file_path: str) -> xr.Dataset:
-        """
-        Helper method to open the NetCDF and apply initial standardizations.
-        """
-        ds = xr.open_dataset(file_path)
-
-        # 1. Select variables and levels
-        # We only want to select 'level' if it exists in the dataset (some are 2D surface fields)
-        if self.levels is not None and "level" in ds.coords:
-            ds = ds.sel(level=list(self.levels), **self._level_sel_kwargs)
-
-        # 2. Rename dimensions/variables to standard
-        existing_rename = {k: v for k, v in self.rename.items() if k in ds.dims or k in ds.coords}
-        ds = ds.rename(existing_rename)
-
-        # 3. Apply any user-defined slices (lat/lon bounding boxes, etc.)
-        ds = self.apply_slices(ds)
-
-        return ds
-    
     #override
     def open_sample_dataset(
         self,
@@ -86,7 +69,6 @@ class NOAA20CR(Source):
         cache_dir: Optional[str] = None,
     ) -> xr.Dataset:
         #caching file first happens here
-        file = "GET THE FILE HERE"
 
         #for this design, assume that we are getting the full year file but only pulling the returning the requested time step
         #this will keep the implementation in line with the datamover calls. Will need to address special cases with mpi before finalizing
@@ -94,16 +76,19 @@ class NOAA20CR(Source):
         #generally want to handle only deleting the cached file if a) the value requested is the last time step of the file
         #or b) the value requested is the last timestep the user requested 
 
+        #TODO: implement file caching handling -- this should probably be per var below
+
         dsdict = {}
         osv = open_static_vars or self._open_static_vars(dims)
         variables = self.variables if osv else self.dynamic_vars
-        #check if we got the files here, we_got_the_data
+        #check if we got the files here, we_got_the_data -- in other files, may need to be below
         for varname in variables:
             dslist = []
             #get the data
             try:
-                thisvar = self._open_single_variable(varname, file)
-            except:
+                filepath = self._build_path(dims['time'], varname)
+                thisvar = self._open_single_variable(dims, varname, filepath)
+            except Exception as e:
                 thisvar = None
             dslist.append(thisvar)
             if len(dslist) == 1:
@@ -135,7 +120,9 @@ class NOAA20CR(Source):
         #data array out of the dataset pulling the data 
         #this is where we will handle translating 20cr has multiple vars named, 
         ds = xr.open_dataset(file_path)
-        
+        # Rename the dimension and its coordinate simultaneously
+        ds = ds.rename({"lat": "latitude", "lon": "longitude"})
+
         #handle variable names that have single levels
         single_level_var = {
             "air_2m" : "air",
@@ -147,15 +134,18 @@ class NOAA20CR(Source):
         }
 
         target_var = single_level_var.get(variable, variable)
-        #somewhere we need to limit to the necessary dimensions of time, lat and lon? 
         var_info = ds.get(target_var)
 
-        result = var_info.sel(time=dims['time'])
+        if variable in self.static_vars:
+            #static vars are time invariant, set to the requested time
+            var_info = var_info.assign_coords(time=[dims['time']])
+        else: 
+            var_info = var_info.sel(time=dims['time']).expand_dims("time") #select the requested time slice
+            #select only requested levels
+            if self.levels is not None and "level" in ds.coords:
+                var_info = var_info.sel(level=list(self.levels), **self._level_sel_kwargs)
 
-        if self.levels is not None and "level" in ds.coords:
-            ds = ds.sel(level=list(self.levels), **self._level_sel_kwargs)
-
-        return result
+        return var_info
 
     
     def _build_path(
@@ -180,33 +170,33 @@ class NOAA20CR(Source):
         if time.year < 1981: 
             year_postfix = "SI"
 
-        if variable == "hgt_sfc":
-            filepath = f"timeInvariant{year_postfix}/hgt_sfc.nc"
+        # if variable == "hgt_sfc":
+        #     filepath = f"timeInvariant{year_postfix}/hgt_sfc.nc"
 
-        if variable == "land":
-            filepath = f"timeInvariant{year_postfix}/land.nc"
+        # if variable == "land":
+        #     filepath = f"timeInvariant{year_postfix}/land.nc"
 
         vars_other_names = {
-            "air_2m" : f"2m{year_postfix}/air.{time.year}.nc",
-            "shum_2m": f"2m{year_postfix}/shum.{time.year}.nc",
-            "uwnd_10m": f"10m{year_postfix}/uwnd.{time.year}.nc",
-            "vwnd_10m": f"10m{year_postfix}/vwnd.{time.year}.nc",
-            "pres_sfc": f"sfc{year_postfix}/pres.{time.year}.nc",
+            "air_2m" : f"2m{year_postfix}/air.2m.{time.year}.nc",
+            "shum_2m": f"2m{year_postfix}/shum.2m.{time.year}.nc",
+            "uwnd_10m": f"10m{year_postfix}/uwnd.10m.{time.year}.nc",
+            "vwnd_10m": f"10m{year_postfix}/vwnd.10m.{time.year}.nc",
+            "pres_sfc": f"sfc{year_postfix}/pres.sfc.{time.year}.nc",
             "skt_sfc": f"sfc{year_postfix}/skt.{time.year}.nc"
         }
 
         if variable == "hgt_sfc":
-            filepath = f"timeInvariant{year_postfix}/hgt_sfc.nc"
+            filepath = f"timeInvariant/hgt_sfc.nc" #TODO: confirm folder location
         elif variable == "land":
-            filepath = f"timeInvariant{year_postfix}/land.nc"
-        elif variable in vars_other_names.keys:
+            filepath = f"timeInvariant/land.nc" #TODO: confirm folder location
+        elif variable in vars_other_names:
             filepath = vars_other_names[variable]
         else:
             filepath = f"prs{year_postfix}/{variable}.{time.year}.nc"
 
-        #TODO: fullpath = f"TO_BE_ADDED/{filepath}"
-        #return full path once defined
+        fullpath = f"/Users/jknezha/Development/20cr_files/{filepath}"
+        #TODO: handle the path for the full FTP
 
-        return filepath 
+        return fullpath 
 
 

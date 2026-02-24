@@ -123,6 +123,7 @@ class DataMover():
                     xds = dlist[0]
                 else:
                     # if len(dlist) == 0, this returns an empty dataset
+                    logger.info(f"dlist: {dlist}")
                     xds = xr.merge(dlist)
                 return xds
 
@@ -208,8 +209,10 @@ class DataMover():
         nds = self.target.manage_coords(nds)
 
         # create empty data arrays
+        logger.info(f"xds.data_vars: {xds.data_vars}")
         for varname in xds.data_vars:
             dims = xds[varname].dims
+            logger.info(f"dims: {dims}")
             shape = tuple(len(nds[key]) for key in dims)
             chunks = {list(dims).index(key): self.target.chunks[key] for key in dims}
             nds[varname] = xr.DataArray(

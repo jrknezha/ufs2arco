@@ -13,7 +13,7 @@ from ufs2arco.log import SimpleFormatter
 
 logger = logging.getLogger("integration-test")
 _local_path = os.path.dirname(__file__)
-_sources = ["replay", "gfs", "gefs", "hrrr", "era5"]
+_sources = ["replay", "gfs", "gefs", "hrrr", "era5", "20cr"]
 _targets = ["base", "anemoi"]
 
 def setup_test_log():
@@ -113,6 +113,7 @@ def _test_static_vars(source, target, store):
         "hrrr": "lsm",
         "replay": "land_static",
         "era5": "round_land_sea_mask",
+        "20cr": "land",
     }[source]
 
     orog = {
@@ -121,6 +122,7 @@ def _test_static_vars(source, target, store):
         "hrrr": "orog",
         "replay": "hgtsfc_static",
         "era5": "orography",
+        "20cr": "hgt_sfc",
     }[source]
 
     # test land sea mask
@@ -141,7 +143,7 @@ def _test_static_vars(source, target, store):
             np.testing.assert_almost_equal(
                 xda.min().values,
                 0,
-                err_msg=f"Found min != 1 in {source} {target} {varname}",
+                err_msg=f"Found min != 0 in {source} {target} {varname}",
             )
         elif varname == orog:
 
