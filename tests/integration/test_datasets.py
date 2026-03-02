@@ -133,6 +133,9 @@ def _test_static_vars(source, target, store):
         else:
             xda = ds[varname]
 
+        print(f"varname {varname}, xda {xda}")
+        print(xda.values)
+
         assert np.all(~np.isnan(xda.values)), f"Found NaNs in {source} {target} {varname}"
         if varname == lsm:
             np.testing.assert_almost_equal(

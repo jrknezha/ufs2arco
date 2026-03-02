@@ -130,7 +130,8 @@ class NOAA20CR(Source):
             "uwnd_10m": "uwnd",
             "vwnd_10m": "vwnd",
             "pres_sfc": "pres",
-            "skt_sfc": "skt"
+            "skt_sfc": "skt",
+            "hgt_sfc": "hgt"
         }
 
         target_var = single_level_var.get(variable, variable)
@@ -138,7 +139,7 @@ class NOAA20CR(Source):
 
         if variable in self.static_vars:
             #static vars are time invariant, set to the requested time
-            var_info = var_info.assign_coords(time=[dims['time']])
+            var_info = var_info.drop_indexes("time", errors="ignore").reset_coords("time", drop=True).squeeze(drop=True)
         else: 
             var_info = var_info.sel(time=dims['time']).expand_dims("time") #select the requested time slice
             #select only requested levels
@@ -186,7 +187,7 @@ class NOAA20CR(Source):
         }
 
         if variable == "hgt_sfc":
-            filepath = f"timeInvariant/hgt_sfc.nc" #TODO: confirm folder location
+            filepath = f"timeInvariant/hgt.sfc.nc" #TODO: confirm folder location
         elif variable == "land":
             filepath = f"timeInvariant/land.nc" #TODO: confirm folder location
         elif variable in vars_other_names:

@@ -40,11 +40,21 @@ source:
     - 1000
 
 target:
-  name: base
-  rename:
-    level: pressure
+  name: anemoi
+  forcings:
+    - cos_latitude
+    - sin_latitude
+    - cos_longitude
+    - sin_longitude
+    - cos_julian_day
+    - sin_julian_day
+    - cos_local_time
+    - sin_local_time
+    - cos_solar_zenith_angle
+    - insolation
+
   chunks:
     time: 1
-    pressure: -1
-    latitude: -1
-    longitude: -1
+    variable: -1
+    ensemble: 1
+    cell: -1

@@ -17,6 +17,7 @@ source:
     start: 2009-01-01T00
   variables:
   - land
+  - hgt_sfc
   - air
   - air_2m
 target:
