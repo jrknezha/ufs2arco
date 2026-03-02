@@ -23,6 +23,7 @@ directories:
 
 source:
   name: noaa_20cr
+  data_folder: /Users/jknezha/Development/20cr_files
   time:
     start: 2009-01-01T00
     end: 2009-01-01T18

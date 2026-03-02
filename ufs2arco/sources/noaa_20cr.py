@@ -47,12 +47,14 @@ class NOAA20CR(Source):
     def __init__(
         self,
         time: dict,
+        data_folder: str,
         variables: Optional[list | tuple] = None,
         levels: Optional[list | tuple] = None,
         use_nearest_levels: Optional[bool] = False,
         slices: Optional[dict] = None,
     ) -> None:
         self.time = pd.date_range(**time)
+        self.data_folder = data_folder
 
         super().__init__(
             variables=variables,
@@ -165,17 +167,9 @@ class NOAA20CR(Source):
         :return: Description
         :rtype: str
         """
-        #ftp = "ftp2.psl.noaa.gov"
-
         year_postfix = "MO"
         if time.year < 1981: 
             year_postfix = "SI"
-
-        # if variable == "hgt_sfc":
-        #     filepath = f"timeInvariant{year_postfix}/hgt_sfc.nc"
-
-        # if variable == "land":
-        #     filepath = f"timeInvariant{year_postfix}/land.nc"
 
         vars_other_names = {
             "air_2m" : f"2m{year_postfix}/air.2m.{time.year}.nc",
@@ -187,16 +181,16 @@ class NOAA20CR(Source):
         }
 
         if variable == "hgt_sfc":
-            filepath = f"timeInvariant/hgt.sfc.nc" #TODO: confirm folder location
+            filepath = f"timeInvariant{year_postfix}/hgt.sfc.nc"
         elif variable == "land":
-            filepath = f"timeInvariant/land.nc" #TODO: confirm folder location
+            filepath = f"timeInvariant{year_postfix}/land.nc"
         elif variable in vars_other_names:
             filepath = vars_other_names[variable]
         else:
             filepath = f"prs{year_postfix}/{variable}.{time.year}.nc"
 
-        fullpath = f"/Users/jknezha/Development/20cr_files/{filepath}"
-        #TODO: handle the path for the full FTP
+        
+        fullpath = f"{self.data_folder}/{filepath}"
 
         return fullpath 
 

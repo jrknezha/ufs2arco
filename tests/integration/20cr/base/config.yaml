@@ -6,6 +6,7 @@ mover:
   batch_size: 2
   name: datamover
 source:
+  data_folder: /Users/jknezha/Development/20cr_files
   levels:
   - 100
   - 500
