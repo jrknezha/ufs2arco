@@ -6,6 +6,7 @@ mover:
   batch_size: 2
   name: datamover
 source:
+  data_folder: /Users/jknezha/Development/20cr_files
   levels:
   - 100
   - 500
@@ -20,6 +21,22 @@ source:
   - hgt_sfc
   - air
   - air_2m
+  - uwnd
+  - vwnd
+  - shum
+  - hgt
+  - shum_2m
+  - uwnd_10m
+  - vwnd_10m
+  - pres_sfc
+  - skt_sfc
+  - tcdc
+  - lhtfl
+  - cape
+  - pr_wtr
+  - soilm
+  - prmsl
+  - prate
 target:
   chunks:
     cell: -1

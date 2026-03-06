@@ -23,7 +23,8 @@ class NOAA20CR(Source):
     available_variables = (
         "uwnd", "vwnd", "air", "shum", "hgt", "air_2m", "shum_2m", 
         "uwnd_10m", "vwnd_10m", "pres_sfc", "skt_sfc", 
-        "land", "hgt_sfc",
+        "land", "hgt_sfc", "tcdc", "lhtfl", "cape", "pr_wtr",
+        "soilm", "prmsl", "prate"
     )
 
     # Standard 20CR v3 pressure levels (hPa)
@@ -177,7 +178,14 @@ class NOAA20CR(Source):
             "uwnd_10m": f"10m{year_postfix}/uwnd.10m.{time.year}.nc",
             "vwnd_10m": f"10m{year_postfix}/vwnd.10m.{time.year}.nc",
             "pres_sfc": f"sfc{year_postfix}/pres.sfc.{time.year}.nc",
-            "skt_sfc": f"sfc{year_postfix}/skt.{time.year}.nc"
+            "skt_sfc": f"sfc{year_postfix}/skt.{time.year}.nc",
+            "tcdc": f"misc{year_postfix}/tcdc.eatm.{time.year}.nc",
+            "lhtfl": f"sfcFlx{year_postfix}/lhtfl.{time.year}.nc",
+            "cape": f"sfc{year_postfix}/cape.{time.year}.nc",
+            "pr_wtr": f"misc{year_postfix}/pr_wtr.eatm.{time.year}.nc",
+            "soilm": f"subsfc{year_postfix}/soilm.{time.year}.nc",
+            "prmsl": f"misc{year_postfix}/prmsl.{time.year}.nc",
+            "prate": f"sfc{year_postfix}/prate.{time.year}.nc"
         }
 
         if variable == "hgt_sfc":
