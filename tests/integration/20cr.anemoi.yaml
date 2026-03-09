@@ -50,6 +50,7 @@ source:
     - soilm 
     - prmsl
     - prate
+    - apcp
 
   levels:
     - 100

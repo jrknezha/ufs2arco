@@ -24,7 +24,7 @@ class NOAA20CR(Source):
         "uwnd", "vwnd", "air", "shum", "hgt", "air_2m", "shum_2m", 
         "uwnd_10m", "vwnd_10m", "pres_sfc", "skt_sfc", 
         "land", "hgt_sfc", "tcdc", "lhtfl", "cape", "pr_wtr",
-        "soilm", "prmsl", "prate"
+        "soilm", "prmsl", "prate", "apcp"
     )
 
     # Standard 20CR v3 pressure levels (hPa)
@@ -185,7 +185,8 @@ class NOAA20CR(Source):
             "pr_wtr": f"misc{year_postfix}/pr_wtr.eatm.{time.year}.nc",
             "soilm": f"subsfc{year_postfix}/soilm.{time.year}.nc",
             "prmsl": f"misc{year_postfix}/prmsl.{time.year}.nc",
-            "prate": f"sfc{year_postfix}/prate.{time.year}.nc"
+            "prate": f"sfc{year_postfix}/prate.{time.year}.nc",
+            "apcp": f"accums{year_postfix}/apcp.{time.year}.nc"
         }
 
         if variable == "hgt_sfc":

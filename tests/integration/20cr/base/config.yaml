@@ -37,6 +37,7 @@ source:
   - soilm
   - prmsl
   - prate
+  - apcp
 target:
   chunks:
     latitude: -1
