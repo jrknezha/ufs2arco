@@ -51,7 +51,12 @@ class Anemoi(Target):
 
     @property
     def expanded_horizontal_dims(self):
-        return tuple(self.protected_rename.get(d, d) for d in self.source.horizontal_dims)
+        # First, get the original source dimensions, with any renaming due to regridding, or other transformation operations
+        # based on explicit user provided information
+        ehd = tuple(self.transformed_dims.get(d, d) for d in self.source.horizontal_dims)
+
+        # Now do the protected renaming, which manages anemoi specific stuff
+        return tuple(self.protected_rename.get(d, d) for d in ehd)
 
     @property
     def horizontal_dims(self):
@@ -140,7 +145,14 @@ class Anemoi(Target):
         compute_temporal_residual_statistics: Optional[bool] = False,
         sort_channels_by_levels: Optional[bool] = False,
         variables_with_nans: Optional[list] = None,
+        transformed_dims: Optional[dict] = None,
     ) -> None:
+        """
+
+        Args:
+            ... the rest of the docs ...
+            transformed_dims (dict, optional): if your dataset gets regridded to have new dimension names, e.g. from latitude/longitude to a curvilinear grid with y/x coordinates (in the case of GFS -> HRRR grid), we need to explicitly tell the target class about this transformation, so it knows how to handle horizontal dimensions, since horizontal dimensions are always different. So this would be based on dimension order e.g. {'latitude': 'y', 'longitude': 'x'}
+        """
 
         super().__init__(
             source=source,
@@ -166,11 +178,7 @@ class Anemoi(Target):
                 self.rename.pop(key)
 
         self.variables_with_nans = variables_with_nans
-
-
-    def get_expanded_dim_order(self, xds):
-        """this is used in :meth:`map_static_to_expanded`"""
-        return ("time", "ensemble") + tuple(xds.attrs["stack_order"])
+        self.transformed_dims = transformed_dims if transformed_dims else {}
 
 
     def apply_transforms_to_sample(
@@ -445,6 +453,7 @@ class Anemoi(Target):
                 for this_channel, name in zip(channel, varlist)
             ],
             dim="variable",
+            data_vars="all",
             combine_attrs="drop",
         )
         nds = data_vars.to_dataset(name="data")
@@ -822,7 +831,7 @@ class Anemoi(Target):
 
         attrs_list = [xds.attrs.copy() for xds in dslist]
 
-        result = xr.concat(dslist, dim="variable", combine_attrs="drop")
+        result = xr.concat(dslist, dim="variable", data_vars="all", combine_attrs="drop")
 
         # these should not have a variable dimension
         for key in ["latitudes", "longitudes"]:
@@ -866,3 +875,91 @@ def _merge_attrs(list_of_dicts):
 
     merged_dict["variables_metadata"] = {key: vmetadata[key] for key in merged_dict["variables"]}
     return merged_dict
+
+
+class AnemoiInferenceWithForcings(Anemoi):
+    """
+    Augmented "anemoi" target to be used for creating datasets for inference.
+    THis facilitiates everything the anemoi target does,
+    but only loads initial conditions, and then calculates forcings for the entire requested forecast.
+    """
+
+    def __init__(
+        self,
+        source: Source,
+        chunks: dict,
+        store_path: str,
+        rename: Optional[dict] = None,
+        forcings: Optional[tuple | list] = None,
+        statistics_period: Optional[dict] = None,
+        compute_temporal_residual_statistics: Optional[bool] = False,
+        sort_channels_by_levels: Optional[bool] = False,
+        variables_with_nans: Optional[list] = None,
+        multistep_input: Optional[int] = 1,
+    ) -> None:
+
+        super().__init__(
+            source=source,
+            chunks=chunks,
+            store_path=store_path,
+            rename=rename,
+            forcings=forcings,
+            statistics_period=statistics_period,
+            compute_temporal_residual_statistics=compute_temporal_residual_statistics,
+            sort_channels_by_levels=sort_channels_by_levels,
+            variables_with_nans=variables_with_nans,
+        )
+
+        self.multistep_input = multistep_input
+
+
+    @property
+    def dates_with_data(self):
+        return [
+            self.datetime[0] + i*pd.Timedelta(self.datetime.freqstr)
+            for i in range(self.multistep_input)
+        ]
+
+
+    def load_data_flag(self, dims: dict) -> bool:
+        """
+        Determine if timestep is initial conditions or not.
+        If not, we will not pull all data and simply create a dataset structure to later compute forcings.
+        """
+        timecoord = "t0" if self._has_fhr else "time"
+        t0_val = dims.get(timecoord)
+
+        # depending on how you trained your model you may need to load in a timestep prior to initialization
+        # this helps facilitate that as an option
+        return t0_val in self.dates_with_data
+
+
+    def save_ds_structure(self, ds):
+        """
+        Utility to save structure of our ds.
+        We do this to have coords (time/lat/lon/etc.) readily available later for computing forcings.
+        """
+        coords = {c: ds.coords[c].copy(deep=True) for c in ds.coords}
+
+        # keep static vars, as they don't change over time
+        keep_vars = {"lsm", "orog"}
+
+        data_vars = {}
+        for v, da in ds.data_vars.items():
+            if v in keep_vars:
+                out = da.copy(deep=True)
+            else:
+                # for the rest, create float NaN-filled array with same structure
+                shape = tuple(ds.sizes[d] for d in da.dims)
+                data = np.full(shape, np.nan, dtype=float)
+                out = xr.DataArray(data, dims=da.dims, attrs=dict(da.attrs))
+
+            data_vars[v] = out
+
+            self.ds_structure = xr.Dataset(
+                coords=coords, data_vars=data_vars, attrs=dict(ds.attrs)
+            )
+
+    def reconcile_missing_and_nans(self) -> None:
+        logger.info(f"{self.name}.reconcile_missing_and_nans: Not necessary for this target, we expect nans after initial conditinos")
+        # todo - add logic to just check initial conditions and forcings
