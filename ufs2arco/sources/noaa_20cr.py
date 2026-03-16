@@ -11,10 +11,9 @@ logger = logging.getLogger("ufs2arco")
 
 class NOAA20CR(Source):
     """
-    Source class for NOAA 20th Century Reanalysis (20CR) NetCDF datasets.
+    Source class for NOAA 20th Century Reanalysis version 3 (20CRv3) NetCDF datasets.
     """
 
-    # Typical dimensions for 20CR NetCDF files
     sample_dims = ("time",)
     horizontal_dims = ("latitude", "longitude")
     
@@ -37,8 +36,7 @@ class NOAA20CR(Source):
     @property
     def rename(self) -> dict:
         """
-        Maps NOAA 20CR native naming to ufs2arco standards.
-        Example: Mapping 'lat' to 'latitude' and 'lon' to 'longitude'.
+        Maps NOAA 20CRv3 native naming to ufs2arco standards.
         """
         return {
             "lat": "latitude",
@@ -71,27 +69,16 @@ class NOAA20CR(Source):
         open_static_vars: bool,
         cache_dir: Optional[str] = None,
     ) -> xr.Dataset:
-        #caching file first happens here
-
-        #for this design, assume that we are getting the full year file but only pulling the returning the requested time step
-        #this will keep the implementation in line with the datamover calls. Will need to address special cases with mpi before finalizing
         
-        #generally want to handle only deleting the cached file if a) the value requested is the last time step of the file
-        #or b) the value requested is the last timestep the user requested 
-
-        #TODO: implement file caching handling -- this should probably be per var below
-
         dsdict = {}
         osv = open_static_vars or self._open_static_vars(dims)
         variables = self.variables if osv else self.dynamic_vars
-        #check if we got the files here, we_got_the_data -- in other files, may need to be below
         for varname in variables:
             dslist = []
-            #get the data
             try:
                 filepath = self._build_path(dims['time'], varname)
                 thisvar = self._open_single_variable(dims, varname, filepath)
-            except Exception as e:
+            except Exception:
                 thisvar = None
             dslist.append(thisvar)
             if len(dslist) == 1:
@@ -106,7 +93,6 @@ class NOAA20CR(Source):
                 dsdict = {}
                 break
         
-        # the dataset is either full or completely empty if we had trouble
         xds = xr.Dataset(dsdict)
         if len(xds) > 0:
             xds = self.apply_slices(xds)
@@ -118,10 +104,7 @@ class NOAA20CR(Source):
             variable: str,
             file_path: str
     ) -> xr.DataArray:
-        #here we get the variable from the file
 
-        #data array out of the dataset pulling the data 
-        #this is where we will handle translating 20cr has multiple vars named, 
         ds = xr.open_dataset(file_path)
         # Rename the dimension and its coordinate simultaneously
         ds = ds.rename({"lat": "latitude", "lon": "longitude"})
@@ -141,7 +124,7 @@ class NOAA20CR(Source):
         var_info = ds.get(target_var)
 
         if variable in self.static_vars:
-            #static vars are time invariant, set to the requested time
+            #static vars are time invariant, ignore the time
             var_info = var_info.drop_indexes("time", errors="ignore").reset_coords("time", drop=True).squeeze(drop=True)
         else: 
             var_info = var_info.sel(time=dims['time']).expand_dims("time") #select the requested time slice

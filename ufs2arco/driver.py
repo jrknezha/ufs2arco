@@ -274,7 +274,6 @@ class Driver:
             if has_content:
 
                 xds = xds.reset_coords(drop=True)
-                logger.info(f"Here is xds before error: {xds}")
                 region = self.mover.find_my_region(xds)
                 xds.to_zarr(self.store_path, region=region)
                 self.mover.clear_cache(batch_idx)

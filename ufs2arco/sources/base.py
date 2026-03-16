@@ -107,7 +107,6 @@ class Source:
         msg = f"\n{title}\n" + \
               "".join(["-" for _ in range(len(title))]) + "\n"
         attrslist = list(self.sample_dims) + ["variables", "levels", "use_nearest_levels", "slices"]
-        print(attrslist)
         for key in attrslist:
             msg += f"{key:<18s}: {getattr(self, key)}\n"
         if hasattr(self, "_accum_hrs"):
